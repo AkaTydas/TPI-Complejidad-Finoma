@@ -73,7 +73,6 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
     return result;
 }
 
-// Helper function to return the string representation of the operation
 const char* get_op_symbol(TipoOperacion op) {
     switch (op) {
         case OP_SUM: return "+";
@@ -143,15 +142,18 @@ void voraz(int array[], int size, int goal)
                 if (joker_base != -1) {
                     int prev_ac = ac;
                     
+                    pasos_totales++;
+                    printf("[Paso %d] [COMODIN]: Operacion interna log_%d(%d) -> Resultado Temp: 1\n", pasos_totales, joker_base, joker_base);
+                    
+                    pasos_totales++;
                     if (ac < goal) {
                         ac += 1; 
-                        printf("[Paso %d] [COMODIN]: %d + log_%d(%d) -> Nuevo AC: %d\n", pasos_totales + 1, prev_ac, joker_base, joker_base, ac);
+                        printf("[Paso %d] [COMODIN]: %d + 1 -> Nuevo AC: %d | (Distancia restante: %d)\n", pasos_totales, prev_ac, ac, abs(ac - goal));
                     } else if (ac > goal) {
                         ac -= 1; 
-                        printf("[Paso %d] [COMODIN]: %d - log_%d(%d) -> Nuevo AC: %d\n", pasos_totales + 1, prev_ac, joker_base, joker_base, ac);
+                        printf("[Paso %d] [COMODIN]: %d - 1 -> Nuevo AC: %d | (Distancia restante: %d)\n", pasos_totales, prev_ac, ac, abs(ac - goal));
                     }
                     
-                    pasos_totales += 2; 
                     distancia_anterior = abs(ac - goal);
                     estancamientos_consecutivos = 0; 
                     comodin_usado = 1;
@@ -162,15 +164,13 @@ void voraz(int array[], int size, int goal)
                             break;
                         }
                     }
-                    printf(">>> [Sistema]: Blacklisting temporal del elemento %d.\n", mejor_elemento);
+                    // System print removed as requested
+                    printf("\n"); 
                     
                 } else {
                     printf("CRITICAL FAILURE: Imposible crear el comodin con este arreglo.\n");
                     return;
                 }
-            } else {
-                // Silent the first warning to keep the trace clean, it's just an internal check anyway.
-                // printf("[Warning] Rebote detectado. Intentando una vez mas...\n");
             }
         } else {
              blacklisted_element_index = -1;
@@ -183,7 +183,6 @@ void voraz(int array[], int size, int goal)
             distancia_anterior = menor_distancia;
             pasos_totales++;
             
-            // The requested trace print
             printf("[Paso %d] Operacion: %d %s %d -> Nuevo AC: %d | (Distancia restante: %d)\n", 
                    pasos_totales, prev_ac, get_op_symbol(mejor_op), mejor_elemento, ac, abs(ac - goal));
         }
