@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <limits.h>
 // gcc voraz.c -o voraz -lm
+
+#define NUMERO_OPERACIONES 7
 
 /*
     El enfoque Greedy toma decisiones óptimas locales 
@@ -42,10 +45,14 @@ int calcular_operacion(int a, int b, TipoOperacion operacion)
             return a - b;
         case OP_MUL:
             return a * b;
+        case OP_DIV:
+            return a / b;
         case OP_POW:
             return pow(a,b);
         case OP_ROOT:
-            return pow(a, 1.0 / b);
+            return pow(a, 1.0 / b); // por propiedad de la raiz es equivalente a la potencia de la inversa
+        case OP_LOG:
+            return (log((double)a) / log((double)b)); // logaritmo en base b del argumento a 
         default:
             printf("operacion invalida");
             return 0; 
@@ -55,7 +62,45 @@ int calcular_operacion(int a, int b, TipoOperacion operacion)
 void voraz(int array[], int size, int goal)
 {
     int ac = 0; // acumulador
-    printf("continuara... algun dia, de paso veo como es subir esto a git\n");
+    int distancia_anterior = abs(ac - goal);
+
+    while (ac != goal)
+    {
+        int menor_distancia = INT_MAX;
+        TipoOperacion mejor_op = OP_INVALIDA;
+        int mejor_elemento = 0;
+
+        for (int i=0; i<size; i++){
+
+            for (int j=0; j<NUMERO_OPERACIONES; j++){
+                int resultado = calcular_operacion(ac, array[i], j);
+                int distancia_actual = abs(resultado - goal);
+
+
+                if (distancia_actual < menor_distancia)
+                {
+                    menor_distancia = distancia_actual;
+                    mejor_op = (TipoOperacion)j;
+                    mejor_elemento = array[i];
+                }
+            }
+        }
+
+        // Pa que el bucle no sea infinito
+        if (menor_distancia >= distancia_anterior)
+        {
+            printf("Estancado en un optimo local\n”");
+            printf("NO ES POSIBLE RESOLVER EL PROBLEMA CON ESTAS CONFIGURACIONES SIGUIENDO ESTA HEURISTICA\n");
+            return;
+        }
+
+        ac = calcular_operacion(ac, mejor_elemento, mejor_op);
+        distancia_anterior = menor_distancia;
+
+        printf("Valor del acumulador nuevo es: %d\n", ac);
+    }
+
+    printf("Completado con exito!\n");
 };
 
 
