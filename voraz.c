@@ -73,6 +73,20 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
     return result;
 }
 
+// Helper function to return the string representation of the operation
+const char* get_op_symbol(TipoOperacion op) {
+    switch (op) {
+        case OP_SUM: return "+";
+        case OP_RES: return "-";
+        case OP_MUL: return "*";
+        case OP_DIV: return "/";
+        case OP_POW: return "^";
+        case OP_ROOT: return "root";
+        case OP_LOG: return "log";
+        default: return "?";
+    }
+}
+
 void voraz(int array[], int size, int goal)
 {
     int ac = 0; 
@@ -80,16 +94,10 @@ void voraz(int array[], int size, int goal)
     int pasos_totales = 0;
     
     int estancamientos_consecutivos = 0; 
-    
-    // We introduce a 'forced offset' to avoid checking the same array element 
-    // immediately after using a joker if it was causing the loop.
-    // However, in a pure greedy, the 'for' loop checks ALL elements every time.
-    // The issue you noted is that if the Greedy logic ALWAYS picks the exact same 
-    // 'mejor_elemento' and 'mejor_op' even after a +1/-1 nudge, it will stall again.
-    // By forcing a different base for the joker or temporarily blacklisting an element,
-    // we can break the cycle.
-    
     int blacklisted_element_index = -1;
+
+    printf("\n--- INICIANDO ALGORITMO VORAZ ---\n");
+    printf("Objetivo (B): %d | Estado Inicial: %d\n\n", goal, ac);
 
     while (ac != goal)
     {
@@ -99,7 +107,6 @@ void voraz(int array[], int size, int goal)
         int comodin_usado = 0;
 
         for (int i=0; i<size; i++){
-            // Skip the blacklisted element for this iteration if there is one
             if (i == blacklisted_element_index) continue;
             
             for (int j=0; j<NUMERO_OPERACIONES; j++){
@@ -113,8 +120,6 @@ void voraz(int array[], int size, int goal)
                         menor_distancia = distancia_actual;
                         mejor_op = (TipoOperacion)j;
                         mejor_elemento = array[i];
-                        // We track which index gave us the "best" so far
-                        // just in case we need to blacklist it later
                     }
                 }
             }
@@ -128,7 +133,6 @@ void voraz(int array[], int size, int goal)
                 printf("\n--- [FALLBACK ENGAGED] Optimo local detectado. ---\n");
                 
                 int joker_base = -1;
-                // We pick a joker base
                 for(int k = size - 1; k >= 0; k--) {
                     if (array[k] > 0 && array[k] != 1) {
                         joker_base = array[k];
@@ -137,14 +141,14 @@ void voraz(int array[], int size, int goal)
                 }
                 
                 if (joker_base != -1) {
-                    printf(">>> Forzando comodin: Creando un '1' usando log_%d(%d)\n", joker_base, joker_base);
+                    int prev_ac = ac;
                     
                     if (ac < goal) {
                         ac += 1; 
-                        printf(">>> Sumando el comodin al acumulador.\n");
+                        printf("[Paso %d] [COMODIN]: %d + log_%d(%d) -> Nuevo AC: %d\n", pasos_totales + 1, prev_ac, joker_base, joker_base, ac);
                     } else if (ac > goal) {
                         ac -= 1; 
-                        printf(">>> Restando el comodin al acumulador.\n");
+                        printf("[Paso %d] [COMODIN]: %d - log_%d(%d) -> Nuevo AC: %d\n", pasos_totales + 1, prev_ac, joker_base, joker_base, ac);
                     }
                     
                     pasos_totales += 2; 
@@ -152,48 +156,40 @@ void voraz(int array[], int size, int goal)
                     estancamientos_consecutivos = 0; 
                     comodin_usado = 1;
                     
-                    // The core fix you mentioned: 
-                    // To prevent the exact same evaluation loop on the next iteration,
-                    // we could 'blacklist' the element that led us to this stall for ONE cycle,
-                    // forcing the Greedy algorithm to pick the second-best option and explore a new branch.
-                    // However, in this specific Greedy implementation, the loop always starts from index 0
-                    // and checks ALL elements. If we just nudged the accumulator by +/- 1, the landscape 
-                    // has mathematically changed, so the 'best' option MIGHT naturally be different.
-                    // But to guarantee we don't fall into the exact same oscillation, we can temporarily 
-                    // ignore the element that caused the stall.
-                    
-                    // Find the index of 'mejor_elemento' to blacklist it next turn
                     for (int idx = 0; idx < size; idx++) {
                         if (array[idx] == mejor_elemento) {
                             blacklisted_element_index = idx;
                             break;
                         }
                     }
-                    printf(">>> Blacklisting temporalmente el elemento %d para forzar una nueva ruta.\n", mejor_elemento);
+                    printf(">>> [Sistema]: Blacklisting temporal del elemento %d.\n", mejor_elemento);
                     
                 } else {
                     printf("CRITICAL FAILURE: Imposible crear el comodin con este arreglo.\n");
                     return;
                 }
             } else {
-                printf("[Warning] Rebote detectado. Intentando una vez mas...\n");
+                // Silent the first warning to keep the trace clean, it's just an internal check anyway.
+                // printf("[Warning] Rebote detectado. Intentando una vez mas...\n");
             }
         } else {
-             // If we found a genuinely better path without stalling, clear any blacklist
              blacklisted_element_index = -1;
         }
 
         if (!comodin_usado) {
             MathResult final_res = calcular_operacion(ac, mejor_elemento, mejor_op);
+            int prev_ac = ac;
             ac = final_res.value;
             distancia_anterior = menor_distancia;
             pasos_totales++;
+            
+            // The requested trace print
+            printf("[Paso %d] Operacion: %d %s %d -> Nuevo AC: %d | (Distancia restante: %d)\n", 
+                   pasos_totales, prev_ac, get_op_symbol(mejor_op), mejor_elemento, ac, abs(ac - goal));
         }
-
-        printf("Valor del acumulador nuevo es: %d\n", ac);
     }
 
-    printf("\nCompletado con exito en %d pasos!\n", pasos_totales);
+    printf("\n>>> Completado con exito en %d pasos!\n", pasos_totales);
 };
 
 int main(void){
@@ -228,13 +224,13 @@ int main(void){
 
     qsort(array, array_size, sizeof(int), compare_desc);
 
-    printf("Arreglo generado (Ordenado Descendente): [ ");
+    printf("\nArreglo generado (Ordenado Descendente):\n[ ");
     for (int i = 0; i < array_size; i++) {
         printf("%d ", array[i]);
     }
-    printf("]\n");
+    printf("]\n\n");
 
-    printf("Ingrese el numero al que quiere llegar: ");
+    printf("Ingrese el numero al que quiere llegar (B): ");
     if (scanf("%d", &goal) != 1) return 1;
 
     voraz(array, array_size, goal);
