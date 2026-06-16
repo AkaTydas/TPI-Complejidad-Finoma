@@ -89,7 +89,7 @@ void voraz(int array[], int size, int goal)
         // Pa que el bucle no sea infinito
         if (menor_distancia >= distancia_anterior)
         {
-            printf("Estancado en un optimo local\n”");
+            printf("Estancado en un optimo local\n");
             printf("NO ES POSIBLE RESOLVER EL PROBLEMA CON ESTAS CONFIGURACIONES SIGUIENDO ESTA HEURISTICA\n");
             return;
         }
