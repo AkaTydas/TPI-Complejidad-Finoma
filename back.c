@@ -51,10 +51,18 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
                 result.is_valid = 1;
             }
             break;
-        case OP_POW:
-            result.value = pow(a, b);
-            result.is_valid = 1;
+        case OP_POW: {
+            double temporal = pow(a,b);
+            // Si supera los limites para operaciones MUY grandes lo consideramos una operacion invalida
+            // Si mantenemos esto asi se deberá aclarar en el informe
+            if (temporal > INT_MAX || temporal < INT_MIN){
+                result.is_valid = 0;
+            } else{
+                result.value = (int)temporal;
+                result.is_valid = 1;
+            } 
             break;
+        }
         case OP_ROOT:
             if (b != 0 && a >= 0) {
                 result.value = pow(a, 1.0 / b);
@@ -107,7 +115,7 @@ Node* crear_nodo(int valor, int total_hijos){
     {
         nuevo->hijos[i] = NULL;    
     }
-    printf("se creo el nodo con el valor %d\n", valor);
+
     return nuevo;
 }
 
@@ -127,28 +135,40 @@ void liberar_arbol(Node* nodo, int total_hijos){
 }
 
 
-void construir_arbol(Node* nodo, int array[], int size, int goal, int nivel, int acumulador, int total_hijos){
+void construir_arbol(Node* nodo, int array[], int size, int goal, int nivel, int acumulador, int total_hijos, int* mejor_solucion){
+    // PODA
+    if (nivel >= *mejor_solucion){return;}
+    if (nivel == 15) {return;} // LIMITE
+
     // caso base 1
-    if (acumulador == goal){printf("llegamos yey\n"); return;}
-    // caso base 2
-    if (nivel == size || acumulador > goal){return;} //volve pa tra
+    if (acumulador == goal){
+        printf("Mejor solucion encontrada en %d pasos!\n", nivel); 
+        *mejor_solucion = nivel;
+        return;
+    }
 
     // casos recursivos
-    for (int i=0; i < NUMERO_OPERACIONES; i++)
+    for (int k=0; k < size; k++)
     {
-        MathResult resultado = calcular_operacion(acumulador, array[nivel], i);
-        int nuevo_acumulador = resultado.value;
+        for (int i=0; i < NUMERO_OPERACIONES; i++)
+        {
+            MathResult resultado = calcular_operacion(acumulador, array[k], i);
 
-        Node* hijo = crear_nodo(nuevo_acumulador, total_hijos);
+            if (resultado.is_valid){
+                int nuevo_acumulador = resultado.value;
 
-        nodo->hijos[i] = hijo;
-        hijo->padre = nodo;
+                Node* hijo = crear_nodo(nuevo_acumulador, total_hijos);
+                
+                int indice_hijo = (k * NUMERO_OPERACIONES) + i;
+                nodo->hijos[indice_hijo] = hijo;
+                hijo->padre = nodo;
 
-        construir_arbol(hijo, array, size, goal, nivel + 1, nuevo_acumulador, total_hijos);
+                construir_arbol(hijo, array, size, goal, nivel + 1, nuevo_acumulador, total_hijos, mejor_solucion);
+            }
+        }
     }
 
 }
-
 
 
 void backtracking(int array[], int size, int goal){
@@ -156,11 +176,14 @@ void backtracking(int array[], int size, int goal){
     int ac = 0;
     int total_hijos = NUMERO_OPERACIONES * size;
     Node* raiz = crear_nodo(0,total_hijos);
+    int mejor_solucion = 14; // absurdamente grande --> equivale a haber explorado 14^(14) nodos distintos
  
-    construir_arbol(raiz, array, size, goal, 0, ac, total_hijos);
+    construir_arbol(raiz, array, size, goal, 0, ac, total_hijos, &mejor_solucion);
 
-    printf("patata");
+    printf("patata\n");
     liberar_arbol(raiz, total_hijos);
+
+    
 }
 
 int main(void)
