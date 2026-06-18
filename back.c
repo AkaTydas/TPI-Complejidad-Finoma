@@ -127,6 +127,42 @@ void liberar_arbol(Node* nodo, int total_hijos){
 }
 
 
+void construir_arbol(Node* nodo, int array[], int size, int goal, int nivel, int acumulador, int total_hijos){
+    // caso base 1
+    if (acumulador == goal){printf("llegamos yey\n"); return;}
+    // caso base 2
+    if (nivel == size || acumulador > goal){return;} //volve pa tra
+
+    // casos recursivos
+    for (int i=0; i < NUMERO_OPERACIONES; i++)
+    {
+        MathResult resultado = calcular_operacion(acumulador, array[nivel], i);
+        int nuevo_acumulador = resultado.value;
+
+        Node* hijo = crear_nodo(nuevo_acumulador, total_hijos);
+
+        nodo->hijos[i] = hijo;
+        hijo->padre = nodo;
+
+        construir_arbol(hijo, array, size, goal, nivel + 1, nuevo_acumulador, total_hijos);
+    }
+
+}
+
+
+
+void backtracking(int array[], int size, int goal){
+
+    int ac = 0;
+    int total_hijos = NUMERO_OPERACIONES * size;
+    Node* raiz = crear_nodo(0,total_hijos);
+ 
+    construir_arbol(raiz, array, size, goal, 0, ac, total_hijos);
+
+    printf("patata");
+    liberar_arbol(raiz, total_hijos);
+}
+
 int main(void)
 {
     int *array;
@@ -169,9 +205,8 @@ int main(void)
     printf("Ingrese el numero al que quiere llegar (B): ");
     if (scanf("%d", &goal) != 1) return 1;
 
-    int total_hijos = NUMERO_OPERACIONES * goal;
-    Node* raiz = crear_nodo(0,total_hijos);
+    
+    backtracking(array, array_size, goal);
 
     free(array);
-    liberar_arbol(raiz, total_hijos);
 }
