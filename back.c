@@ -92,25 +92,86 @@ const char* get_op_symbol(TipoOperacion op) {
 typedef struct Node{
     int value;
     struct Node *padre;
-    struct Node *hijos[NUMERO_OPERACIONES];
+    struct Node **hijos;
 } Node;
 
 // Crear un nodo con un valor
-Node* crear_nodo(int valor){ 
+Node* crear_nodo(int valor, int total_hijos){ 
     Node* nuevo = malloc(sizeof(Node));
     nuevo->value = valor;
     nuevo->padre = NULL;
 
-    for (int i=0; i<NUMERO_OPERACIONES; i++)
+    nuevo->hijos = malloc(total_hijos * sizeof(Node*));
+
+    for (int i=0; i< total_hijos; i++)
     {
         nuevo->hijos[i] = NULL;    
     }
-
+    printf("se creo el nodo con el valor %d\n", valor);
     return nuevo;
+}
+
+// Pa que no quede leekeando memoria
+void liberar_arbol(Node* nodo, int total_hijos){
+    if (nodo == NULL) return;
+
+    for (int i=0; i<total_hijos; i++)
+    {
+        if (nodo->hijos[i] != NULL){
+            liberar_arbol(nodo->hijos[i], total_hijos);
+        }
+    }
+
+    free(nodo->hijos);
+    free(nodo);
 }
 
 
 int main(void)
 {
-    printf("PATATA\n");
+    int *array;
+    int array_size;
+    int goal;
+
+    srand(time(NULL));
+
+    printf("Tamanio del arreglo: ");
+    if (scanf("%d", &array_size) != 1) return 1;
+
+    array = (int *)calloc(array_size, sizeof(int));
+
+    int elementos_generados = 0;
+    while (elementos_generados < array_size) {
+        int num_aleatorio = (rand() % 100) + 1; 
+        
+        int repetido = 0;
+        for (int j = 0; j < elementos_generados; j++) {
+            if (array[j] == num_aleatorio) {
+                repetido = 1;
+                break;
+            }
+        }
+
+        if (!repetido) {
+            array[elementos_generados] = num_aleatorio;
+            elementos_generados++;
+        }
+    }
+
+    qsort(array, array_size, sizeof(int), compare_desc);
+
+    printf("\nArreglo generado (Ordenado Descendente):\n[ ");
+    for (int i = 0; i < array_size; i++) {
+        printf("%d ", array[i]);
+    }
+    printf("]\n\n");
+
+    printf("Ingrese el numero al que quiere llegar (B): ");
+    if (scanf("%d", &goal) != 1) return 1;
+
+    int total_hijos = NUMERO_OPERACIONES * goal;
+    Node* raiz = crear_nodo(0,total_hijos);
+
+    free(array);
+    liberar_arbol(raiz, total_hijos);
 }
