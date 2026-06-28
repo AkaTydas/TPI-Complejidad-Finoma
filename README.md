@@ -47,6 +47,22 @@ Dado que las operaciones pueden reducir los valores, el problema presenta depend
 * **Relación de Recurrencia:**
   $$DP[S] = \min_{a \in A, \text{op} \in O} (DP[S_{\text{prev}}] + 1)$$
 * **Implementación:** Se procesan los estados nivel por nivel (1 paso, luego 2 pasos, etc.) garantizando encontrar el óptimo global sin evaluar redundancias.
+* Optimizaciones Lógicas (Prevención de Estados Basura):
+Aunque la tabla DP evita procesar estados repetidos, calcular la operación y buscar en la tabla consume ciclos de reloj. Para optimizar el rendimiento y reducir el factor de ramificación del árbol BFS, se implementaron filtros lógicos estrictos antes de la generación del estado:
+
+Filtros de Identidad: Se bloquea la ejecución de operaciones que, por definición matemática, dejarían al acumulador en su estado actual.
+
+Si el elemento del arreglo evaluado es $a_k = 1$, se omiten las operaciones de multiplicación ($S \times 1$), división ($S / 1$) y potencia ($S^1$).
+
+Filtro Módulo: Si el acumulador es estrictamente menor que el elemento del arreglo ($S < a_k$), se omite la operación módulo ($S \pmod{a_k}$), ya que el resultado es idéntico al estado actual $S$.
+
+Asimismo, si el estado actual es $S = 1$, se omite el cálculo de la raíz cuadrada ($\sqrt{1}$). Esto evita sobrecargar la tabla Hash con cálculos estériles.
+
+Filtros de Destrucción de Información (Prevención de Colapso a Cero): Debido a la regla estricta de truncamiento absoluto (floor), ciertas operaciones de reducción pueden destruir todo el progreso alcanzado. Puesto que el nodo raíz del algoritmo es 0 (el estado inicial), cualquier rama que devuelva el acumulador a 0 es, matemáticamente, el peor camino posible.
+
+Filtro de Reducción y Módulo: La división entera ($S / a_k$) y el logaritmo ($\log_{a_k}(S)$) se bloquean si $S < a_k$. De manera análoga, la operación módulo ($S \pmod{a_k}$) se bloquea siempre que $S$ sea un múltiplo exacto de $a_k$ (es decir, $S \pmod{a_k} == 0$), ya que en todos estos casos el estado colapsaría inmediatamente a 0.
+
+Filtro del Cero: Si el estado actual extraído de la cola es exactamente 0, se omiten las operaciones de multiplicación, división, módulo, potencia y logaritmo, ya que todas resultarán en 0 o en un error de dominio, evaluándose únicamente la suma.
 
 ### 3. Algoritmo Voraz (Heurística Miope)
 El enfoque Greedy toma decisiones óptimas locales en cada paso con la esperanza de llegar al óptimo global, demostrando el comportamiento de un algoritmo que no puede realizar *backtracking*.
