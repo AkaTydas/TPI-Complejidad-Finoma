@@ -1,16 +1,18 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <limits.h>
 #include <time.h> 
 
-#define NUMERO_OPERACIONES 7
+#define NUMERO_OPERACIONES 8
 
 typedef enum{ 
     OP_SUM,
     OP_RES,
     OP_MUL,
     OP_DIV,
+    OP_MOD,
     OP_POW,
     OP_ROOT,
     OP_LOG,
@@ -26,12 +28,10 @@ int compare_desc(const void *a, const void *b) {
     return (*(int*)b - *(int*)a);
 }
 
-MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
-{
+MathResult calcular_operacion(int a, int b, TipoOperacion operacion) {
     MathResult result = {0, 0}; 
 
-    switch (operacion)
-    {
+    switch (operacion) {
         case OP_SUM:
             result.value = a + b;
             result.is_valid = 1;
@@ -50,10 +50,22 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
                 result.is_valid = 1;
             }
             break;
-        case OP_POW:
-            result.value = pow(a, b);
-            result.is_valid = 1;
+        case OP_MOD:
+            if (b != 0) {
+                result.value = a % b;
+                result.is_valid = 1;
+            }
             break;
+        case OP_POW: {
+            double temporal = pow(a, b);
+            if (temporal > INT_MAX || temporal < INT_MIN) {
+                result.is_valid = 0;
+            } else {
+                result.value = (int)temporal;
+                result.is_valid = 1;
+            } 
+            break;
+        }
         case OP_ROOT:
             if (b != 0 && a >= 0) {
                 result.value = pow(a, 1.0 / b);
@@ -67,7 +79,7 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
             }
             break;
         default:
-            printf("operacion invalida");
+            result.is_valid = 0;
             break; 
     }
     return result;
@@ -79,6 +91,7 @@ const char* get_op_symbol(TipoOperacion op) {
         case OP_RES: return "-";
         case OP_MUL: return "*";
         case OP_DIV: return "/";
+        case OP_MOD: return "%";
         case OP_POW: return "^";
         case OP_ROOT: return "root";
         case OP_LOG: return "log";
@@ -86,36 +99,29 @@ const char* get_op_symbol(TipoOperacion op) {
     }
 }
 
-void voraz(int array[], int size, int goal)
-{
+void voraz(int array[], int size, int goal) {
     int ac = 0; 
     int distancia_anterior = abs(ac - goal);
     int pasos_totales = 0;
     
-    int estancamientos_consecutivos = 0; 
-    int blacklisted_element_index = -1;
-
     printf("\n--- INICIANDO ALGORITMO VORAZ ---\n");
-    printf("Objetivo (B): %d | Estado Inicial: %d\n\n", goal, ac);
+    printf("Objetivo (B): %d | Estado Inicial: %d\n", goal, ac);
+    printf("========================================\n");
 
-    while (ac != goal)
-    {
+    while (ac != goal) {
         int menor_distancia = INT_MAX;
         TipoOperacion mejor_op = OP_INVALIDA;
         int mejor_elemento = 0;
-        int comodin_usado = 0;
 
-        for (int i=0; i<size; i++){
-            if (i == blacklisted_element_index) continue;
-            
-            for (int j=0; j<NUMERO_OPERACIONES; j++){
-                MathResult res = calcular_operacion(ac, array[i], j);
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < NUMERO_OPERACIONES; j++) {
+                MathResult res = calcular_operacion(ac, array[i], (TipoOperacion)j);
                 
-                if (res.is_valid) {
+                // Poda de redundancia para el Voraz: no hacer operaciones que no muten el estado
+                if (res.is_valid && res.value != ac) {
                     int distancia_actual = abs(res.value - goal);
 
-                    if (distancia_actual < menor_distancia)
-                    {
+                    if (distancia_actual < menor_distancia) {
                         menor_distancia = distancia_actual;
                         mejor_op = (TipoOperacion)j;
                         mejor_elemento = array[i];
@@ -124,74 +130,36 @@ void voraz(int array[], int size, int goal)
             }
         }
 
-        if (menor_distancia >= distancia_anterior || mejor_op == OP_INVALIDA)
-        {
-            estancamientos_consecutivos++;
-            
-            if (estancamientos_consecutivos >= 2) {
-                printf("\n--- [FALLBACK ENGAGED] Optimo local detectado. ---\n");
-                
-                int joker_base = -1;
-                for(int k = size - 1; k >= 0; k--) {
-                    if (array[k] > 0 && array[k] != 1) {
-                        joker_base = array[k];
-                        break;
-                    }
-                }
-                
-                if (joker_base != -1) {
-                    int prev_ac = ac;
-                    
-                    pasos_totales++;
-                    printf("[Paso %d] [COMODIN]: Operacion interna log_%d(%d) -> Resultado Temp: 1\n", pasos_totales, joker_base, joker_base);
-                    
-                    pasos_totales++;
-                    if (ac < goal) {
-                        ac += 1; 
-                        printf("[Paso %d] [COMODIN]: %d + 1 -> Nuevo AC: %d | (Distancia restante: %d)\n", pasos_totales, prev_ac, ac, abs(ac - goal));
-                    } else if (ac > goal) {
-                        ac -= 1; 
-                        printf("[Paso %d] [COMODIN]: %d - 1 -> Nuevo AC: %d | (Distancia restante: %d)\n", pasos_totales, prev_ac, ac, abs(ac - goal));
-                    }
-                    
-                    distancia_anterior = abs(ac - goal);
-                    estancamientos_consecutivos = 0; 
-                    comodin_usado = 1;
-                    
-                    for (int idx = 0; idx < size; idx++) {
-                        if (array[idx] == mejor_elemento) {
-                            blacklisted_element_index = idx;
-                            break;
-                        }
-                    }
-                    // System print removed as requested
-                    printf("\n"); 
-                    
-                } else {
-                    printf("CRITICAL FAILURE: Imposible crear el comodin con este arreglo.\n");
-                    return;
-                }
-            }
-        } else {
-             blacklisted_element_index = -1;
+        // Condición de falla: Si el Voraz no puede achicar la distancia, se traba.
+        if (menor_distancia >= distancia_anterior || mejor_op == OP_INVALIDA) {
+            printf("\n[!] FALLO CRITICO: El algoritmo Voraz ha caido en un optimo local.\n");
+            printf("    No existen operaciones validas que reduzcan la distancia actual (%d).\n", distancia_anterior);
+            printf("    El algoritmo no puede hacer Backtracking. Abortando...\n");
+            printf("========================================\n\n");
+            return;
         }
 
-        if (!comodin_usado) {
-            MathResult final_res = calcular_operacion(ac, mejor_elemento, mejor_op);
-            int prev_ac = ac;
-            ac = final_res.value;
-            distancia_anterior = menor_distancia;
-            pasos_totales++;
-            
-            printf("[Paso %d] Operacion: %d %s %d -> Nuevo AC: %d | (Distancia restante: %d)\n", 
-                   pasos_totales, prev_ac, get_op_symbol(mejor_op), mejor_elemento, ac, abs(ac - goal));
-        }
+        // Aplicamos el mejor movimiento encontrado
+        MathResult final_res = calcular_operacion(ac, mejor_elemento, mejor_op);
+        int prev_ac = ac;
+        ac = final_res.value;
+        distancia_anterior = menor_distancia;
+        pasos_totales++;
+        
+        printf("[Paso %2d] Acumulador actual: %-6d | Operacion: %-4s %-4d | Resultado: %d\n", 
+               pasos_totales, 
+               prev_ac, 
+               get_op_symbol(mejor_op), 
+               mejor_elemento, 
+               ac);
     }
 
-    printf("\n>>> Completado con exito en %d pasos!\n", pasos_totales);
-};
+    printf("========================================\n");
+    printf(" EXITO: Solucion encontrada en %d pasos\n", pasos_totales);
+    printf("========================================\n\n");
+}
 
-int main(void){
+int main(void) {
     int *array;
     int array_size;
     int goal;
