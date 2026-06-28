@@ -61,6 +61,6 @@ El enfoque Greedy toma decisiones óptimas locales en cada paso con la esperanza
 El proyecto está diseñado bajo el estándar C11 y se compila utilizando `gcc`. Debido al uso de funciones matemáticas de `<math.h>`, es indispensable enlazar la biblioteca matemática mediante el flag `-lm`.
 
 ```bash
-gcc -O3 src/backtracking.c -o bin/backtracking -lm
+gcc -O3 src/back.c -o bin/back -lm
 gcc -O3 src/dp.c -o bin/dp -lm
-gcc -O3 src/greedy.c -o bin/greedy -lm
+gcc -O3 src/voraz.c -o bin/voraz -lm
