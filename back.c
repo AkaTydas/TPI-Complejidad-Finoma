@@ -4,14 +4,14 @@
 #include <limits.h>
 #include <time.h>
 
-// ESTO ES TODO IGUAL QUE EL VORAZ
-#define NUMERO_OPERACIONES 7
+#define NUMERO_OPERACIONES 8
 
-typedef enum{ 
+typedef enum { 
     OP_SUM,
     OP_RES,
     OP_MUL,
     OP_DIV,
+    OP_MOD,
     OP_POW,
     OP_ROOT,
     OP_LOG,
@@ -23,16 +23,36 @@ typedef struct {
     int is_valid;
 } MathResult;
 
+// Estructura para recordar las operaciones del camino
+typedef struct {
+    int operand;
+    TipoOperacion op;
+} Step;
+
+// Estructura para evaluar y ordenar los siguientes movimientos (Heurística)
+typedef struct {
+    int operand;
+    TipoOperacion op;
+    int result_value;
+    int distance;
+} Move;
+
+// Función para ordenar el arreglo inicial
 int compare_desc(const void *a, const void *b) {
     return (*(int*)b - *(int*)a);
 }
 
-MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
-{
+// Función para ordenar los movimientos por distancia al objetivo (Heurística)
+int compare_moves(const void *a, const void *b) {
+    Move *moveA = (Move *)a;
+    Move *moveB = (Move *)b;
+    return moveA->distance - moveB->distance;
+}
+
+MathResult calcular_operacion(int a, int b, TipoOperacion operacion) {
     MathResult result = {0, 0}; 
 
-    switch (operacion)
-    {
+    switch (operacion) {
         case OP_SUM:
             result.value = a + b;
             result.is_valid = 1;
@@ -51,13 +71,17 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
                 result.is_valid = 1;
             }
             break;
+        case OP_MOD:
+            if (b != 0) {
+                result.value = a % b;
+                result.is_valid = 1;
+            }
+            break;
         case OP_POW: {
-            double temporal = pow(a,b);
-            // Si supera los limites para operaciones MUY grandes lo consideramos una operacion invalida
-            // Si mantenemos esto asi se deberá aclarar en el informe
-            if (temporal > INT_MAX || temporal < INT_MIN){
+            double temporal = pow(a, b);
+            if (temporal > INT_MAX || temporal < INT_MIN) {
                 result.is_valid = 0;
-            } else{
+            } else {
                 result.value = (int)temporal;
                 result.is_valid = 1;
             } 
@@ -65,7 +89,7 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
         }
         case OP_ROOT:
             if (b != 0 && a >= 0) {
-                result.value = pow(a, 1.0 / b);
+                result.value = (int)pow(a, 1.0 / b);
                 result.is_valid = 1;
             }
             break;
@@ -76,7 +100,7 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion)
             }
             break;
         default:
-            printf("operacion invalida");
+            result.is_valid = 0;
             break; 
     }
     return result;
@@ -88,6 +112,7 @@ const char* get_op_symbol(TipoOperacion op) {
         case OP_RES: return "-";
         case OP_MUL: return "*";
         case OP_DIV: return "/";
+        case OP_MOD: return "%";
         case OP_POW: return "^";
         case OP_ROOT: return "root";
         case OP_LOG: return "log";
@@ -95,99 +120,92 @@ const char* get_op_symbol(TipoOperacion op) {
     }
 }
 
-// ACA EMPIEZA LO ORIGINAL
+// --- CORE DEL ALGORITMO OPTIMIZADO ---
 
-typedef struct Node{
-    int value;
-    struct Node *padre;
-    struct Node **hijos;
-} Node;
-
-// Crear un nodo con un valor
-Node* crear_nodo(int valor, int total_hijos){ 
-    Node* nuevo = malloc(sizeof(Node));
-    nuevo->value = valor;
-    nuevo->padre = NULL;
-
-    nuevo->hijos = malloc(total_hijos * sizeof(Node*));
-
-    for (int i=0; i< total_hijos; i++)
-    {
-        nuevo->hijos[i] = NULL;    
+void construir_arbol_implicito(int array[], int size, int goal, int nivel, int acumulador, int *mejor_solucion, Step *camino_actual, Step *mejor_camino) {
+    
+    if (nivel >= *mejor_solucion) {
+        return; 
     }
 
-    return nuevo;
-}
-
-// Pa que no quede leekeando memoria
-void liberar_arbol(Node* nodo, int total_hijos){
-    if (nodo == NULL) return;
-
-    for (int i=0; i<total_hijos; i++)
-    {
-        if (nodo->hijos[i] != NULL){
-            liberar_arbol(nodo->hijos[i], total_hijos);
-        }
-    }
-
-    free(nodo->hijos);
-    free(nodo);
-}
-
-
-void construir_arbol(Node* nodo, int array[], int size, int goal, int nivel, int acumulador, int total_hijos, int* mejor_solucion){
-    // PODA
-    if (nivel >= *mejor_solucion){return;}
-    if (nivel == 15) {return;} // LIMITE
-
-    // caso base 1
-    if (acumulador == goal){
-        printf("Mejor solucion encontrada en %d pasos!\n", nivel); 
+    if (acumulador == goal) {
         *mejor_solucion = nivel;
+        for (int i = 0; i < nivel; i++) {
+            mejor_camino[i] = camino_actual[i];
+        }
         return;
     }
 
-    // casos recursivos
-    for (int k=0; k < size; k++)
-    {
-        for (int i=0; i < NUMERO_OPERACIONES; i++)
-        {
-            MathResult resultado = calcular_operacion(acumulador, array[k], i);
+    if (nivel == 14) return;
 
-            if (resultado.is_valid){
-                int nuevo_acumulador = resultado.value;
+    Move moves[size * NUMERO_OPERACIONES];
+    int valid_moves_count = 0;
 
-                Node* hijo = crear_nodo(nuevo_acumulador, total_hijos);
+    for (int k = 0; k < size; k++) {
+        for (int i = 0; i < NUMERO_OPERACIONES; i++) {
+            
+            MathResult resultado = calcular_operacion(acumulador, array[k], (TipoOperacion)i);
+
+            if (resultado.is_valid && resultado.value != acumulador) {
+                moves[valid_moves_count].operand = array[k];
+                moves[valid_moves_count].op = (TipoOperacion)i;
+                moves[valid_moves_count].result_value = resultado.value;
+                moves[valid_moves_count].distance = abs(goal - resultado.value);
                 
-                int indice_hijo = (k * NUMERO_OPERACIONES) + i;
-                nodo->hijos[indice_hijo] = hijo;
-                hijo->padre = nodo;
-
-                construir_arbol(hijo, array, size, goal, nivel + 1, nuevo_acumulador, total_hijos, mejor_solucion);
+                valid_moves_count++;
             }
         }
     }
 
+    qsort(moves, valid_moves_count, sizeof(Move), compare_moves);
+
+    for (int m = 0; m < valid_moves_count; m++) {
+        camino_actual[nivel].operand = moves[m].operand;
+        camino_actual[nivel].op = moves[m].op;
+        
+        construir_arbol_implicito(array, size, goal, nivel + 1, moves[m].result_value, mejor_solucion, camino_actual, mejor_camino);
+    }
 }
 
-
-void backtracking(int array[], int size, int goal){
-
-    int ac = 0;
-    int total_hijos = NUMERO_OPERACIONES * size;
-    Node* raiz = crear_nodo(0,total_hijos);
-    int mejor_solucion = 14; // absurdamente grande --> equivale a haber explorado 14^(14) nodos distintos
- 
-    construir_arbol(raiz, array, size, goal, 0, ac, total_hijos, &mejor_solucion);
-
-    printf("patata\n");
-    liberar_arbol(raiz, total_hijos);
-
+void backtracking(int array[], int size, int goal) {
+    int max_depth = 15; 
+    int mejor_solucion = max_depth;
     
+    Step *camino_actual = (Step *)calloc(max_depth, sizeof(Step));
+    Step *mejor_camino = (Step *)calloc(max_depth, sizeof(Step));
+
+    printf("\nBuscando la ruta optima en el espacio de estados...\n");
+    
+    construir_arbol_implicito(array, size, goal, 0, 0, &mejor_solucion, camino_actual, mejor_camino);
+
+    if (mejor_solucion < max_depth) {
+        printf("\n========================================\n");
+        printf(" EXITO: Solucion encontrada en %d pasos\n", mejor_solucion);
+        printf("========================================\n");
+        
+        int ac_display = 0; 
+        for (int i = 0; i < mejor_solucion; i++) {
+            MathResult temp = calcular_operacion(ac_display, mejor_camino[i].operand, mejor_camino[i].op);
+            
+            printf("[Paso %2d] Acumulador actual: %-6d | Operacion: %-4s %-4d | Resultado: %d\n", 
+                   i + 1, 
+                   ac_display, 
+                   get_op_symbol(mejor_camino[i].op), 
+                   mejor_camino[i].operand, 
+                   temp.value);
+                   
+            ac_display = temp.value;
+        }
+        printf("========================================\n\n");
+    } else {
+        printf("\n[!] No se encontro ninguna solucion en %d pasos o menos.\n\n", max_depth - 1);
+    }
+
+    free(camino_actual);
+    free(mejor_camino);
 }
 
-int main(void)
-{
+int main(void) {
     int *array;
     int array_size;
     int goal;
@@ -228,8 +246,8 @@ int main(void)
     printf("Ingrese el numero al que quiere llegar (B): ");
     if (scanf("%d", &goal) != 1) return 1;
 
-    
     backtracking(array, array_size, goal);
 
     free(array);
+    return 0;
 }
