@@ -47,10 +47,9 @@ Dado que las operaciones pueden reducir los valores, el problema presenta depend
 * **Relación de Recurrencia:**
   $$DP[S] = \min_{a \in A, \text{op} \in O} (DP[S_{\text{prev}}] + 1)$$
 * **Implementación:** Se procesan los estados nivel por nivel (1 paso, luego 2 pasos, etc.) garantizando encontrar el óptimo global sin evaluar redundancias.
-* Optimizaciones Lógicas (Prevención de Estados Basura): Para maximizar el rendimiento y reducir el factor de ramificación, se implementaron filtros lógicos estrictos antes de generar y consultar la tabla Hash:
-** Filtros de Identidad: Se bloquean operaciones que dejan al acumulador en su estado actual. Si $a_k = 1$, se omiten $\times 1$, $/ 1$ y $S^1$. Si $S < a_k$, se omite el módulo ($S \pmod{a_k}$). Si $S = 1$, se omite $\sqrt{1}$.
-
-**Filtros de Colapso a Cero: Se bloquean operaciones de reducción que destruyen el progreso devolviendo el estado al nodo raíz (0). Si $S < a_k$, se ignora la división entera y el logaritmo. Si $S \pmod{a_k} == 0$, se omite la operación módulo. **Si el estado actual extraído ya es 0, se descartan todas las operaciones excepto la suma.
+* **Optimizaciones Lógicas (Prevención de Estados Basura):** Para maximizar el rendimiento y reducir el factor de ramificación, se implementaron filtros lógicos estrictos antes de generar y consultar la tabla Hash:
+  *  **Filtros de Identidad:** Se bloquean operaciones que dejan al acumulador en su estado actual. Si $a_k = 1$, se omiten $\times 1$, $/ 1$ y $S^1$. Si $S < a_k$, se omite el módulo ($S \pmod{a_k}$). Si $S = 1$, se omite $\sqrt{1}$.
+  *  **Filtros de Colapso a Cero:** Se bloquean operaciones de reducción que destruyen el progreso devolviendo el estado al nodo raíz (0). Si $S < a_k$, se ignora la división entera y el logaritmo. Si $S \pmod{a_k} == 0$, se omite la operación módulo. Si el estado actual extraído ya es 0, se descartan todas las operaciones excepto la suma.
 
 ### 3. Algoritmo Voraz (Heurística Miope)
 El enfoque Greedy toma decisiones óptimas locales en cada paso con la esperanza de llegar al óptimo global, demostrando el comportamiento de un algoritmo que no puede realizar *backtracking*.
