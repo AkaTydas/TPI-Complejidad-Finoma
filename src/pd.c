@@ -1,387 +1,240 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
+#include <math.h>
+#include <limits.h>
 #include <time.h>
 
-// Definición de límites prácticos y seguros
-#define MAX_VAL 1000000      // Rango del acumulador [-1000000, 1000000]
-#define QUEUE_SIZE 2500000   // Tamaño máximo de la lista secuencial para almacenar estados
+#define NUMERO_OPERACIONES 8
+// Para hacer DP Pura, necesitamos un universo finito. Limitamos el acumulador máximo.
+#define MAX_ESTADO 1000000 
+#define INF 999999
+#define MAX_DEPTH 15
 
-// Estructura simple solicitada que representa cada estado en la lista plana
+typedef enum { 
+    OP_SUM, OP_RES, OP_MUL, OP_DIV, 
+    OP_MOD, OP_POW, OP_ROOT, OP_LOG, 
+    OP_INVALIDA
+} TipoOperacion;
+
 typedef struct {
-    int value;               // Valor del acumulador en este estado
-    int ops;                 // Cantidad de operaciones para llegar aquí
-    int parent_idx;          // Índice del estado predecesor en la lista (para reconstrucción)
-    char op;                 // Operación: '+', '-', '*', '/', '%', '^', 'L' (log), 'R' (raiz)
-    int operand;             // Operando del arreglo A utilizado
-} State;
+    int value;
+    int is_valid;
+} MathResult;
 
-// Estructuras de datos globales ubicadas en Heap para evitar desbordar el Stack
-State* Queue = NULL;
-bool* Visited = NULL;
+// Estructura para reconstruir el camino en la tabla DP
+typedef struct {
+    int prev_val;
+    TipoOperacion op;
+    int operand;
+} PathTracker;
 
-// --- FUNCIONES MATEMÁTICAS EN ENTEROS CON TRUNCAMIENTO ABSOLUTO (FLOOR) ---
+int compare_desc(const void *a, const void *b) {
+    return (*(int*)b - *(int*)a);
+}
 
-long long safe_pow(long long base, long long exp) {
-    if (exp < 0) return 0;
-    if (exp == 0) return 1;
-    if (base == 0) return 0;
-    if (base == 1) return 1;
-    if (base == -1) return (exp % 2 == 0) ? 1 : -1;
-    
-    long long res = 1;
-    for (int i = 0; i < exp; i++) {
-        res *= base;
-        if (res > MAX_VAL || res < -MAX_VAL) {
-            return MAX_VAL + 1; // Indicador de desborde
+MathResult calcular_operacion(int a, int b, TipoOperacion operacion) {
+    MathResult result = {0, 0}; 
+    switch (operacion) {
+        case OP_SUM: result.value = a + b; result.is_valid = 1; break;
+        case OP_RES: result.value = a - b; result.is_valid = 1; break;
+        case OP_MUL: 
+            // Prevenir overflow antes de operar
+            if (a != 0 && b > INT_MAX / a) { result.is_valid = 0; break; }
+            result.value = a * b; result.is_valid = 1; break;
+        case OP_DIV:
+            if (b != 0) { result.value = a / b; result.is_valid = 1; } break;
+        case OP_MOD:
+            if (b != 0) { result.value = a % b; result.is_valid = 1; } break;
+        case OP_POW: {
+            double temporal = pow(a, b);
+            if (temporal > MAX_ESTADO || temporal < 0) {
+                result.is_valid = 0;
+            } else {
+                result.value = (int)temporal; result.is_valid = 1;
+            } break;
         }
+        case OP_ROOT:
+            if (b != 0 && a >= 0) {
+                result.value = (int)pow(a, 1.0 / b); result.is_valid = 1;
+            } break;
+        case OP_LOG:
+            if (a > 0 && b > 0 && b != 1) {
+                result.value = (int)(log((double)a) / log((double)b)); result.is_valid = 1;
+            } break;
+        default: result.is_valid = 0; break; 
     }
-    return res;
+    return result;
 }
 
-int safe_log(int x, int base) {
-    if (x <= 0 || base <= 1) return -1;
-    int count = 0;
-    long long temp = base;
-    while (temp <= x) {
-        count++;
-        if (temp > x / base) break;
-        temp *= base;
-    }
-    return count;
-}
-
-int safe_root(int x, int base) {
-    if (x < 0 || base <= 0) return -1;
-    if (base == 1) return x;
-    if (x == 0 || x == 1) return x;
-    
-    int low = 0, high = x, ans = 0;
-    while (low <= high) {
-        int mid = low + (high - low) / 2;
-        long long p = safe_pow(mid, base);
-        if (p <= x && p != MAX_VAL + 1) {
-            ans = mid;
-            low = mid + 1;
-        } else {
-            high = mid - 1;
-        }
-    }
-    return ans;
-}
-
-bool is_duplicate(int* arr, int size, int val) {
-    for (int i = 0; i < size; i++) {
-        if (arr[i] == val) return true;
-    }
-    return false;
-}
-
-void init_structures() {
-    if (Queue == NULL) {
-        Queue = (State*)malloc(QUEUE_SIZE * sizeof(State));
-    }
-    if (Visited == NULL) {
-        Visited = (bool*)calloc(2 * MAX_VAL + 1, sizeof(bool));
-    } else {
-        for (int i = 0; i < 2 * MAX_VAL + 1; i++) {
-            Visited[i] = false;
-        }
+const char* get_op_symbol(TipoOperacion op) {
+    switch (op) {
+        case OP_SUM: return "+"; case OP_RES: return "-";
+        case OP_MUL: return "*"; case OP_DIV: return "/";
+        case OP_MOD: return "%"; case OP_POW: return "^";
+        case OP_ROOT: return "root"; case OP_LOG: return "log";
+        default: return "?";
     }
 }
 
-void print_solution(int target_idx) {
-    int steps_count = Queue[target_idx].ops;
-    int* path = (int*)malloc((steps_count + 1) * sizeof(int));
-    
-    int curr = target_idx;
-    for (int i = steps_count; i >= 0; i--) {
-        path[i] = curr;
-        curr = Queue[curr].parent_idx;
-    }
-    
-    printf("\n=================================================================\n");
-    printf(" ¡SOLUCION ENCONTRADA! Se llego a B en %d operaciones.\n", steps_count);
-    printf("=================================================================\n\n");
-    
-    printf("Estado inicial: Acumulador = 0\n");
-    for (int i = 1; i <= steps_count; i++) {
-        State step = Queue[path[i]];
-        State prev = Queue[path[i-1]];
-        
-        printf("  [Paso %d]: ", i);
-        switch (step.op) {
-            case '+':
-                printf("%d + %d = %d", prev.value, step.operand, step.value);
-                break;
-            case '-':
-                printf("%d - %d = %d", prev.value, step.operand, step.value);
-                break;
-            case '*':
-                printf("%d * %d = %d", prev.value, step.operand, step.value);
-                break;
-            case '/':
-                printf("%d / %d = %d (truncado)", prev.value, step.operand, step.value);
-                break;
-            case '%':
-                printf("%d %% %d = %d", prev.value, step.operand, step.value);
-                break;
-            case '^':
-                printf("%d ^ %d = %d", prev.value, step.operand, step.value);
-                break;
-            case 'L':
-                printf("log en base %d de (%d) = %d (truncado)", step.operand, prev.value, step.value);
-                break;
-            case 'R':
-                printf("raiz cuadrada de (%d) = %d [operando %d consumido]", prev.value, step.value, step.operand);
-                break;
-        }
-        printf("\n");
-    }
-    printf("\n=================================================================\n");
-    free(path);
-}
+// --- CORE: PROGRAMACIÓN DINÁMICA PURA (TABULACIÓN) ---
 
-// Resolución principal mediante BFS con Poda Lógica
-void solve(int* A, int n, int B) {
-    init_structures();
-    
-    int head = 0;
-    int tail = 0;
-    
-    Queue[tail++] = (State){.value = 0, .ops = 0, .parent_idx = -1, .op = '\0', .operand = 0};
-    Visited[0 + MAX_VAL] = true;
-    
-    if (B == 0) {
-        printf("\nEl acumulador ya se encuentra en el valor objetivo 0 (0 operaciones).\n");
+void programacion_dinamica_pura(int array[], int size, int goal) {
+    if (goal < 0 || goal >= MAX_ESTADO) {
+        printf("[!] Error: El objetivo supera el MAX_ESTADO definido para la tabla DP.\n");
         return;
     }
-    
-    bool found = false;
-    int solution_idx = -1;
-    
-    while (head < tail) {
-        State current = Queue[head];
-        int S = current.value;
-        
-        if (S == B) {
-            found = true;
-            solution_idx = head;
-            break;
-        }
-        
-        // Filtro de colapso global: Si el estado es 0, solo permitimos sumar.
-        bool solo_suma = (S == 0);
-        
-        for (int i = 0; i < n; i++) {
-            int a = A[i];
+
+    printf("\n--- INICIANDO DP PURA (TABULACION BOTTOM-UP) ---\n");
+    printf("Objetivo (B): %d | Estado Inicial: 0\n", goal);
+    printf("Universo acotado a: %d\n", MAX_ESTADO);
+    printf("========================================\n");
+
+    // 1. Crear la Tabla DP: dp[i] = "mínimos pasos para llegar al número i"
+    int *dp = (int *)malloc(MAX_ESTADO * sizeof(int));
+    PathTracker *tracker = (PathTracker *)malloc(MAX_ESTADO * sizeof(PathTracker));
+
+    if (!dp || !tracker) {
+        printf("Error de memoria al crear la tabla DP.\n");
+        if (dp) free(dp);
+        if (tracker) free(tracker);
+        return;
+    }
+
+    // 2. Inicializar casos base
+    for (int i = 0; i < MAX_ESTADO; i++) {
+        dp[i] = INF;
+    }
+    dp[0] = 0; // Se necesitan 0 pasos para llegar a 0
+
+    int solucion_encontrada = 0;
+
+    // 3. Tabulación: Iteramos construyendo las soluciones óptimas paso a paso
+    for (int step = 1; step <= MAX_DEPTH; step++) {
+        int hubo_cambios = 0;
+
+        // Recorremos todo el espacio de estados
+        for (int val = 0; val < MAX_ESTADO; val++) {
             
-            int next_values[8];
-            char ops[8] = {'+', '-', '*', '/', '%', '^', 'L', 'R'};
-            bool valid[8] = {false};
-            
-            // 1. Suma (+) -> Siempre válida
-            next_values[0] = S + a;
-            valid[0] = true;
-            
-            // 2. Resta (-)
-            if (!solo_suma) {
-                next_values[1] = S - a;
-                valid[1] = true;
-            }
-            
-            // 3. Multiplicación (*) -> Filtro identidad (a=1)
-            if (!solo_suma && a != 1) {
-                long long mul = (long long)S * a;
-                if (mul >= -MAX_VAL && mul <= MAX_VAL) {
-                    next_values[2] = (int)mul;
-                    valid[2] = true;
-                }
-            }
-            
-            // 4. División (/) -> Filtro identidad (a=1) y Filtro colapso (|S| < a)
-            if (!solo_suma && a != 0 && a != 1) {
-                if (S >= a || S <= -a) {
-                    next_values[3] = S / a;
-                    valid[3] = true;
-                }
-            }
-            
-            // 5. Módulo (%) -> Filtro identidad (S < a) y Filtro colapso (S % a == 0)
-            if (!solo_suma && a != 0) {
-                if (S >= a && (S % a != 0)) {
-                    next_values[4] = S % a;
-                    valid[4] = true;
-                }
-            }
-            
-            // 6. Potencia (^) -> Filtro identidad (a=1)
-            if (!solo_suma && a != 1) {
-                long long power = safe_pow(S, a);
-                if (power >= -MAX_VAL && power <= MAX_VAL) {
-                    next_values[5] = (int)power;
-                    valid[5] = true;
-                }
-            }
-            
-            // 7. Logaritmo (L) -> Filtro colapso (S < a)
-            if (!solo_suma && S >= a && a > 1) {
-                int log_res = safe_log(S, a);
-                if (log_res != -1) {
-                    next_values[6] = log_res;
-                    valid[6] = true;
-                }
-            }
-            
-            // 8. Raíz Cuadrada (R) -> Filtro identidad (S=1). Índice fijo en 2.
-            if (!solo_suma && S > 1) {
-                int root_res = safe_root(S, 2);
-                if (root_res != -1) {
-                    next_values[7] = root_res;
-                    valid[7] = true;
-                }
-            }
-            
-            // Procesar e insertar los estados válidos
-            for (int op_idx = 0; op_idx < 8; op_idx++) {
-                if (valid[op_idx]) {
-                    int val = next_values[op_idx];
-                    
-                    if (val >= -MAX_VAL && val <= MAX_VAL) {
-                        int idx_offset = val + MAX_VAL;
+            // Solo intentamos avanzar desde estados que fueron alcanzados en el paso anterior
+            if (dp[val] == step - 1) {
+                
+                for (int k = 0; k < size; k++) {
+                    for (int op = 0; op < NUMERO_OPERACIONES; op++) {
                         
-                        if (!Visited[idx_offset]) {
-                            Visited[idx_offset] = true;
+                        MathResult res = calcular_operacion(val, array[k], (TipoOperacion)op);
+
+                        // Si el resultado es válido y cae dentro de nuestro universo DP
+                        if (res.is_valid && res.value >= 0 && res.value < MAX_ESTADO) {
                             
-                            Queue[tail] = (State){
-                                .value = val,
-                                .ops = current.ops + 1,
-                                .parent_idx = head,
-                                .op = ops[op_idx],
-                                .operand = a
-                            };
-                            
-                            if (val == B) {
-                                found = true;
-                                solution_idx = tail;
-                                break;
-                            }
-                            
-                            tail++;
-                            
-                            if (tail >= QUEUE_SIZE) {
-                                printf("\n[Advertencia] Se alcanzo el limite maximo de busqueda fisica de la cola.\n");
-                                head = tail; 
-                                break;
+                            // RELAJACIÓN DP: Si encontramos un camino más corto al estado
+                            if (dp[val] + 1 < dp[res.value]) {
+                                dp[res.value] = dp[val] + 1;
+                                
+                                // Guardamos el rastro para reconstruir el camino luego
+                                tracker[res.value].prev_val = val;
+                                tracker[res.value].op = (TipoOperacion)op;
+                                tracker[res.value].operand = array[k];
+                                hubo_cambios = 1;
                             }
                         }
                     }
                 }
             }
-            if (found) break;
         }
-        if (found) break;
-        head++;
+
+        // Si ya alcanzamos el objetivo con esta cantidad de pasos, paramos
+        if (dp[goal] != INF) {
+            solucion_encontrada = 1;
+            break;
+        }
+
+        // Si iteramos toda la tabla y no hubo ningún cambio, el algoritmo convergió
+        if (!hubo_cambios) break;
     }
-    
-    if (found) {
-        print_solution(solution_idx);
+
+    // 4. Reconstrucción de la solución óptima
+    if (solucion_encontrada) {
+        int pasos_totales = dp[goal];
+        printf(" EXITO: Solucion optima encontrada en %d pasos\n", pasos_totales);
+        printf("========================================\n");
+
+        int *path_values = (int *)malloc((pasos_totales + 1) * sizeof(int));
+        TipoOperacion *path_ops = (TipoOperacion *)malloc((pasos_totales + 1) * sizeof(TipoOperacion));
+        int *path_operands = (int *)malloc((pasos_totales + 1) * sizeof(int));
+
+        int curr_val = goal;
+        for (int i = pasos_totales - 1; i >= 0; i--) {
+            path_values[i] = curr_val;
+            path_ops[i] = tracker[curr_val].op;
+            path_operands[i] = tracker[curr_val].operand;
+            curr_val = tracker[curr_val].prev_val;
+        }
+
+        int ac_display = 0;
+        for (int i = 0; i < pasos_totales; i++) {
+            printf("[Paso %2d] Acumulador actual: %-6d | Operacion: %-4s %-4d | Resultado: %d\n", 
+                   i + 1, 
+                   ac_display, 
+                   get_op_symbol(path_ops[i]), 
+                   path_operands[i], 
+                   path_values[i]);
+            ac_display = path_values[i];
+        }
+        printf("========================================\n\n");
+
+        free(path_values);
+        free(path_ops);
+        free(path_operands);
     } else {
-        printf("\nNo se encontro ninguna combinacion posible para llegar a %d en este rango de busqueda.\n", B);
+        printf("\n[!] No se encontro ninguna solucion en %d pasos o menos dentro del límite MAX_ESTADO.\n\n", MAX_DEPTH);
     }
+
+    free(dp);
+    free(tracker);
 }
 
-int main() {
+int main(void) {
+    int *array;
+    int array_size;
+    int goal;
+
     srand(time(NULL));
-    int opcion;
-    
-    do {
-        printf("\n=== ARBOL DE OPERACIONES CON LISTA SIMPLIFICADA ===\n");
-        printf("1. Modo Manual (Ingresar todos los datos a mano)\n");
-        printf("2. Modo Aleatorio (Generar arreglo y objetivo aleatorios)\n");
-        printf("3. Salir\n");
-        printf("Seleccione una opcion: ");
+
+    printf("Tamanio del arreglo: ");
+    if (scanf("%d", &array_size) != 1) return 1;
+
+    array = (int *)calloc(array_size, sizeof(int));
+
+    int elementos_generados = 0;
+    while (elementos_generados < array_size) {
+        int num_aleatorio = (rand() % 100) + 1; 
         
-        if (scanf("%d", &opcion) != 1) {
-            printf("Entrada invalida. Por favor, ingrese un numero.\n");
-            while (getchar() != '\n'); 
-            continue;
+        int repetido = 0;
+        for (int j = 0; j < elementos_generados; j++) {
+            if (array[j] == num_aleatorio) {
+                repetido = 1;
+                break;
+            }
         }
-        
-        if (opcion == 1) {
-            int n;
-            printf("Ingrese el tamaño del arreglo (N): ");
-            if (scanf("%d", &n) != 1 || n <= 0) {
-                printf("Tamaño no valido.\n");
-                while (getchar() != '\n');
-                continue;
-            }
-            
-            int* A = (int*)malloc(n * sizeof(int));
-            printf("Ingrese los %d enteros positivos (sin repetir) separados por espacios:\n", n);
-            for (int i = 0; i < n; i++) {
-                int input_val;
-                if (scanf("%d", &input_val) != 1 || input_val <= 0) {
-                    printf("Valor incorrecto. Intente nuevamente.\n");
-                    i--;
-                    while (getchar() != '\n');
-                    continue;
-                }
-                if (is_duplicate(A, i, input_val)) {
-                    printf("El numero %d ya esta en el arreglo. Ingrese uno unico.\n", input_val);
-                    i--;
-                    continue;
-                }
-                A[i] = input_val;
-            }
-            
-            int B;
-            printf("Ingrese el numero objetivo positivo (B): ");
-            if (scanf("%d", &B) != 1 || B < 0) {
-                printf("Objetivo invalido.\n");
-                while (getchar() != '\n');
-                free(A);
-                continue;
-            }
-            
-            printf("\nBuscando solucion optima...\n");
-            solve(A, n, B);
-            free(A);
-            
-        } else if (opcion == 2) {
-            int n;
-            printf("Ingrese el tamanio del arreglo a generar (N): ");
-            if (scanf("%d", &n) != 1 || n <= 0) {
-                printf("Tamaño no valido.\n");
-                while (getchar() != '\n');
-                continue;
-            }
-            
-            int* A = (int*)malloc(n * sizeof(int));
-            printf("Arreglo generado aleatoriamente:\n[");
-            for (int i = 0; i < n; i++) {
-                int rand_val;
-                do {
-                    rand_val = rand() % 35 + 1; 
-                } while (is_duplicate(A, i, rand_val));
-                A[i] = rand_val;
-                printf("%d%s", A[i], (i == n - 1) ? "" : ", ");
-            }
-            printf("]\n");
-            
-            int B = rand() % 200 + 10;
-            printf("Numero objetivo aleatorio (B): %d\n", B);
-            
-            printf("\nBuscando solucion optima...\n");
-            solve(A, n, B);
-            free(A);
+        if (!repetido) {
+            array[elementos_generados] = num_aleatorio;
+            elementos_generados++;
         }
-        
-    } while (opcion != 3);
-    
-    if (Queue != NULL) free(Queue);
-    if (Visited != NULL) free(Visited);
-    
-    printf("¡Programa finalizado!\n");
+    }
+
+    qsort(array, array_size, sizeof(int), compare_desc);
+
+    printf("\nArreglo generado (Ordenado Descendente):\n[ ");
+    for (int i = 0; i < array_size; i++) {
+        printf("%d ", array[i]);
+    }
+    printf("]\n\n");
+
+    printf("Ingrese el numero al que quiere llegar (B): ");
+    if (scanf("%d", &goal) != 1) return 1;
+
+    programacion_dinamica_pura(array, array_size, goal);
+
+    free(array);
     return 0;
 }
