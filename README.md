@@ -40,12 +40,10 @@ Este enfoque modela el problema como la búsqueda en un **árbol de espacio de e
 * **Estructura:** Factor de ramificación (*branching factor*) de hasta $8 \times n$.
 * **Poda y Heurística:** Se ordena la evaluación de los nodos hijos utilizando una heurística de distancia (`abs(goal - resultado)`). Al encontrar rápidamente soluciones viables, se ajusta una cota superior (`mejor_solucion`) que poda agresivamente cualquier rama que alcance una profundidad subóptima, evitando el colapso de la memoria.
 
-### 2. Programación Dinámica (Estrategia de Tabulación / BFS)
-Dado que las operaciones pueden reducir los valores, el problema presenta dependencias cíclicas. La estructura óptima en C es mediante **Tabulación combinada con Búsqueda en Anchura (BFS)**.
+### 2. Programación Dinámica (Estrategia de Tabulación Iterativa)
+Dado que las operaciones aritméticas **(+, -)** generan dependencias cíclicas en el espacio de estados, se implementa una tabulación iterativa limitando la profundidad máxima de operaciones ($K$) para romper los ciclos.
 
-* **Definición del Estado:** `DP[S]` almacena el número mínimo de operaciones necesarias para alcanzar el valor $S$.
-* **Relación de Recurrencia:**
-  $$DP[S] = \min_{a \in A, \text{op} \in O} (DP[S_{\text{prev}}] + 1)$$
+* **Definición del Estado:** $DP[S]$ almacena el número mínimo de operaciones necesarias para alcanzar el valor $S$. Se inicializa $DP[0] = 0$ y $DP[S] = \infty$ para el resto de los estados.Relación de Recurrencia: En cada iteración $k$, para todo estado $S$, se evalúa:$DP[S] = \min_{a \in A, op \in O} (DP[S_{prev}] + 1)$Implementación: Se itera sobre todo el arreglo de estados posibles múltiples veces. En cada pasada, los estados descubren caminos más cortos propagando el costo $+1$ a sus estados vecinos generados por las operaciones.Optimizaciones Lógicas (Pruning): (Acá dejás exactamente el mismo texto de tus filtros, que está perfecto).
 * **Implementación:** Se procesan los estados nivel por nivel (1 paso, luego 2 pasos, etc.) garantizando encontrar el óptimo global sin evaluar redundancias.
 * **Optimizaciones Lógicas (Prevención de Estados Basura):** Para maximizar el rendimiento y reducir el factor de ramificación, se implementaron filtros lógicos estrictos antes de generar y consultar la tabla Hash:
   *  **Filtros de Identidad:** Se bloquean operaciones que dejan al acumulador en su estado actual. Si $a_k = 1$, se omiten $\times 1$, $/ 1$ y $S^1$. Si $S < a_k$, se omite el módulo ($S \pmod{a_k}$). Si $S = 1$, se omite $\sqrt{1}$.
