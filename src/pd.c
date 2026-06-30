@@ -5,7 +5,6 @@
 #include <time.h>
 
 #define NUMERO_OPERACIONES 8
-// Para hacer DP Pura, necesitamos un universo finito. Limitamos el acumulador máximo.
 #define MAX_ESTADO 1000000 
 #define INF 999999
 #define MAX_DEPTH 15
@@ -21,7 +20,7 @@ typedef struct {
     int is_valid;
 } MathResult;
 
-// Estructura para reconstruir el camino en la tabla DP
+// Estructura para reconstruir el camino
 typedef struct {
     int prev_val;
     TipoOperacion op;
@@ -38,7 +37,6 @@ MathResult calcular_operacion(int a, int b, TipoOperacion operacion) {
         case OP_SUM: result.value = a + b; result.is_valid = 1; break;
         case OP_RES: result.value = a - b; result.is_valid = 1; break;
         case OP_MUL: 
-            // Prevenir overflow antes de operar
             if (a != 0 && b > INT_MAX / a) { result.is_valid = 0; break; }
             result.value = a * b; result.is_valid = 1; break;
         case OP_DIV:
@@ -76,98 +74,108 @@ const char* get_op_symbol(TipoOperacion op) {
     }
 }
 
-// --- CORE: PROGRAMACIÓN DINÁMICA PURA (TABULACIÓN) ---
+// --- CORE: PROGRAMACIÓN DINÁMICA + BFS (COLA ÓPTIMA) ---
 
-void programacion_dinamica_pura(int array[], int size, int goal) {
+void programacion_dinamica_bfs(int array[], int size, int goal) {
     if (goal < 0 || goal >= MAX_ESTADO) {
         printf("[!] Error: El objetivo supera el MAX_ESTADO definido para la tabla DP.\n");
         return;
     }
 
-    printf("\n--- INICIANDO DP PURA (TABULACION BOTTOM-UP) ---\n");
+    printf("\n--- INICIANDO DP (BFS + TABULACION) ---\n");
     printf("Objetivo (B): %d | Estado Inicial: 0\n", goal);
     printf("Universo acotado a: %d\n", MAX_ESTADO);
     printf("========================================\n");
 
-    // 1. Crear la Tabla DP: dp[i] = "mínimos pasos para llegar al número i"
+    // 1. Reservas de memoria
     int *dp = (int *)malloc(MAX_ESTADO * sizeof(int));
     PathTracker *tracker = (PathTracker *)malloc(MAX_ESTADO * sizeof(PathTracker));
+    
+    // Implementación de Cola (Queue) basada en arreglos
+    // Como nunca visitamos un estado dos veces, el tamaño máximo de la cola es el MAX_ESTADO
+    int *queue = (int *)malloc(MAX_ESTADO * sizeof(int));
 
-    if (!dp || !tracker) {
-        printf("Error de memoria al crear la tabla DP.\n");
+    if (!dp || !tracker || !queue) {
+        printf("Error de memoria (OOM).\n");
         if (dp) free(dp);
         if (tracker) free(tracker);
+        if (queue) free(queue);
         return;
     }
 
-    // 2. Inicializar casos base
+    // 2. Inicialización
     for (int i = 0; i < MAX_ESTADO; i++) {
         dp[i] = INF;
     }
-    dp[0] = 0; // Se necesitan 0 pasos para llegar a 0
+    
+    int head = 0; // Puntero de lectura de la cola
+    int tail = 0; // Puntero de escritura de la cola
+
+    // Caso base
+    dp[0] = 0;
+    queue[tail++] = 0; // Push del 0 a la cola
 
     int solucion_encontrada = 0;
+    int nodos_explorados = 0;
 
-    // 3. Tabulación: Iteramos construyendo las soluciones óptimas paso a paso
-    for (int step = 1; step <= MAX_DEPTH; step++) {
-        int hubo_cambios = 0;
+    // 3. Exploración BFS
+    while (head < tail) {
+        int curr_val = queue[head++]; // Pop de la cola
+        nodos_explorados++;
 
-        // Recorremos todo el espacio de estados
-        for (int val = 0; val < MAX_ESTADO; val++) {
-            
-            // Solo intentamos avanzar desde estados que fueron alcanzados en el paso anterior
-            if (dp[val] == step - 1) {
+        // Si encontramos el objetivo, terminamos. BFS garantiza que es el camino óptimo.
+        if (curr_val == goal) {
+            solucion_encontrada = 1;
+            break; 
+        }
+
+        // Poda: Si ya alcanzamos el límite de profundidad, no generamos hijos para este nodo.
+        if (dp[curr_val] >= MAX_DEPTH) {
+            continue;
+        }
+
+        // Generamos los movimientos válidos solo para el estado actual
+        for (int k = 0; k < size; k++) {
+            for (int op = 0; op < NUMERO_OPERACIONES; op++) {
                 
-                for (int k = 0; k < size; k++) {
-                    for (int op = 0; op < NUMERO_OPERACIONES; op++) {
-                        
-                        MathResult res = calcular_operacion(val, array[k], (TipoOperacion)op);
+                MathResult res = calcular_operacion(curr_val, array[k], (TipoOperacion)op);
 
-                        // Si el resultado es válido y cae dentro de nuestro universo DP
-                        if (res.is_valid && res.value >= 0 && res.value < MAX_ESTADO) {
-                            
-                            // RELAJACIÓN DP: Si encontramos un camino más corto al estado
-                            if (dp[val] + 1 < dp[res.value]) {
-                                dp[res.value] = dp[val] + 1;
-                                
-                                // Guardamos el rastro para reconstruir el camino luego
-                                tracker[res.value].prev_val = val;
-                                tracker[res.value].op = (TipoOperacion)op;
-                                tracker[res.value].operand = array[k];
-                                hubo_cambios = 1;
-                            }
-                        }
+                // Si es válido y está dentro de los límites
+                if (res.is_valid && res.value >= 0 && res.value < MAX_ESTADO) {
+                    
+                    // RELAJACIÓN DP: ¿Es la primera vez que vemos este número?
+                    if (dp[res.value] == INF) {
+                        
+                        dp[res.value] = dp[curr_val] + 1; // Guardamos la distancia mínima
+                        
+                        tracker[res.value].prev_val = curr_val;
+                        tracker[res.value].op = (TipoOperacion)op;
+                        tracker[res.value].operand = array[k];
+                        
+                        queue[tail++] = res.value; // Push a la cola para explorarlo luego
                     }
                 }
             }
         }
-
-        // Si ya alcanzamos el objetivo con esta cantidad de pasos, paramos
-        if (dp[goal] != INF) {
-            solucion_encontrada = 1;
-            break;
-        }
-
-        // Si iteramos toda la tabla y no hubo ningún cambio, el algoritmo convergió
-        if (!hubo_cambios) break;
     }
 
-    // 4. Reconstrucción de la solución óptima
+    // 4. Reconstrucción e impresión
     if (solucion_encontrada) {
         int pasos_totales = dp[goal];
         printf(" EXITO: Solucion optima encontrada en %d pasos\n", pasos_totales);
+        printf(" Nodos explorados (rendimiento real): %d\n", nodos_explorados);
         printf("========================================\n");
 
         int *path_values = (int *)malloc((pasos_totales + 1) * sizeof(int));
         TipoOperacion *path_ops = (TipoOperacion *)malloc((pasos_totales + 1) * sizeof(TipoOperacion));
         int *path_operands = (int *)malloc((pasos_totales + 1) * sizeof(int));
 
-        int curr_val = goal;
+        int trace_val = goal;
         for (int i = pasos_totales - 1; i >= 0; i--) {
-            path_values[i] = curr_val;
-            path_ops[i] = tracker[curr_val].op;
-            path_operands[i] = tracker[curr_val].operand;
-            curr_val = tracker[curr_val].prev_val;
+            path_values[i] = trace_val;
+            path_ops[i] = tracker[trace_val].op;
+            path_operands[i] = tracker[trace_val].operand;
+            trace_val = tracker[trace_val].prev_val;
         }
 
         int ac_display = 0;
@@ -186,11 +194,13 @@ void programacion_dinamica_pura(int array[], int size, int goal) {
         free(path_ops);
         free(path_operands);
     } else {
-        printf("\n[!] No se encontro ninguna solucion en %d pasos o menos dentro del límite MAX_ESTADO.\n\n", MAX_DEPTH);
+        printf("\n[!] No se encontro solucion en %d pasos o el objetivo es inalcanzable.\n", MAX_DEPTH);
+        printf(" Nodos explorados antes de abortar: %d\n\n", nodos_explorados);
     }
 
     free(dp);
     free(tracker);
+    free(queue);
 }
 
 int main(void) {
@@ -233,7 +243,7 @@ int main(void) {
     printf("Ingrese el numero al que quiere llegar (B): ");
     if (scanf("%d", &goal) != 1) return 1;
 
-    programacion_dinamica_pura(array, array_size, goal);
+    programacion_dinamica_bfs(array, array_size, goal);
 
     free(array);
     return 0;
