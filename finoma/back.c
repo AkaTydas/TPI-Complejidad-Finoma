@@ -55,7 +55,8 @@ void backtracking(int array[], int size, int goal) {
     Step *camino_actual = (Step *)calloc(max_depth, sizeof(Step));
     Step *mejor_camino = (Step *)calloc(max_depth, sizeof(Step));
 
-    printf("\nBuscando la ruta optima en el espacio de estados...\n");
+    printf("\n~ BACKTRACKING ~ ");
+    printf("Buscando la ruta optima en el espacio de estados...");
     
     construir_arbol_implicito(array, size, goal, 0, 0, &mejor_solucion, camino_actual, mejor_camino);
 
