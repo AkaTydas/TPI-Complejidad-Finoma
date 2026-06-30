@@ -8,14 +8,22 @@ void carga_aleatoria(int ** array, int* size, int *goal);
 
 int main(void)
 {
+    char* limpiar_pantalla;
+
+    #ifdef _WIN32
+        limpiar_pantalla = "cls";
+    #elif __linux__
+        limpiar_pantalla = "clear";
+    #endif
+
     srand(time(NULL));
 
-    int *array; int array_size; int goal;
+    int *array = NULL; int array_size; int goal;
     int opcion; int metodo;
    
     do{
         printf("=============================================================\n");
-        printf("=== Optimización de Secuencias Operacionales - TPI FINOMA ===\n");
+        printf("\t=== CORRECCION ORBITAL MINIMA - TPI FINOMA ===\n");
         printf("=============================================================\n");
         printf("1. Modo Manual (Ingresar todos los datos a mano)\n");
         printf("2. Modo Aleatorio (Generar arreglo y objetivo aleatorios)\n");
@@ -40,12 +48,21 @@ int main(void)
 
         if (opcion != 4){
             do{
+                system(limpiar_pantalla);
                 printf("=============================================================\n");
-                printf("=== SELECCIONE EL ALGORITMO ===\n");
+                printf("Arreglo:[");
+                for (int i = 0; i < array_size; i++) {
+                    printf("%d%s", array[i], (i == array_size - 1) ? "" : ", ");
+                }
+                printf("]\t");
+                printf("\t\tNumero objetivo (B): %d\n", goal);
+
+                printf("=============================================================\n");
+                printf("\t\t=== SELECCIONE EL ALGORITMO ===\n");
                 printf("1. Greedy\n");
                 printf("2. Backtracking\n");
                 printf("3. Programacion Dinamica\n");
-                printf("4. Volver Atras (BackTrack jaja)\n");
+                printf("4. Volver a la pantalla anterior\n");
                 printf("=============================================================\n");
                 metodo = prompt_int("Seleccione una opcion: ");
 
@@ -59,19 +76,23 @@ int main(void)
                         number_pressed("presione 1 para continuar: ", 1);
                         break;}
                     case 3: {
-                        solve(array, array_size, goal);
+                        programacion_dinamica_pura(array, array_size, goal);
                         number_pressed("presione 1 para continuar: ", 1);
                         break;
                     }
-                    case 4: {opcion = 0; break;}
+                    case 4: {opcion = 0; system(limpiar_pantalla); break;}
                 }
             } while (metodo != 4);
         }
 
     } while (opcion != 4);
-    printf("chao");
     limpiar_pd();
-    free(array);
+    if (array != NULL)
+    {
+        free(array);
+        array = NULL;
+    }
+    
     return 0;
 }
 

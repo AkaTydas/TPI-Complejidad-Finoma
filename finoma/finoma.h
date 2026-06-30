@@ -7,6 +7,11 @@
 #include <stdbool.h>
 
 #define NUMERO_OPERACIONES 8
+// Para hacer DP Pura, necesitamos un universo finito. Limitamos el acumulador máximo.
+#define MAX_ESTADO 1000000 
+#define INF 999999
+#define MAX_DEPTH 15
+
 
 typedef enum{ 
     OP_SUM,
@@ -45,7 +50,7 @@ int compare_moves(const void *a, const void *b);
 MathResult calcular_operacion(int a, int b, TipoOperacion operacion);
 void voraz(int array[], int size, int goal); // algoritmo greedy
 void backtracking(int array[], int size, int goal); // algoritmo backtracking
-void solve(int* A, int n, int B); // algoritmo programacion dinamica
+void programacion_dinamica_pura(int array[], int size, int goal); // algoritmo programacion dinamica
 void limpiar_pd(void);
 bool is_duplicate(int* arr, int size, int val);
 
