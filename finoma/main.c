@@ -48,6 +48,7 @@ int main(void)
 
         if (opcion != 4){
             do{
+                qsort(array, array_size, sizeof(int), compare_desc);
                 system(limpiar_pantalla);
                 printf("=============================================================\n");
                 printf("Arreglo:[");
