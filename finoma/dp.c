@@ -123,8 +123,6 @@ print_solution:
         free(dp[i]);
         free(tracker[i]);
     }
-    free(dp);
-    free(tracker);
 }
 
 void limpiar_pd(){
