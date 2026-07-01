@@ -174,7 +174,7 @@ void carga_aleatoria(int ** array, int* size, int *goal){
     for (int i = 0; i < *size; i++) {
         int rand_val;
         do {
-            rand_val = rand() % 35 + 1; 
+            rand_val = rand() % 100 + 1; 
         } while (is_duplicate(*array, i, rand_val));
         (*array)[i] = rand_val;
         printf("%d%s", (*array)[i], (i == *size - 1) ? "" : ", ");
