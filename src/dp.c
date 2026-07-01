@@ -192,14 +192,23 @@ int main(void) {
 
     array = (int *)calloc(array_size, sizeof(int));
 
+    int rango_maximo = (array_size >= 10) ? array_size * 5 : 50; 
+
     int elems = 0;
     while (elems < array_size) {
-        int num = (rand() % 10) + 1; // Smaller numbers to prevent instant overflows in pure DP
+        int num = (rand() % rango_maximo) + 1; 
+        
         int repetido = 0;
         for (int j = 0; j < elems; j++) {
-            if (array[j] == num) { repetido = 1; break; }
+            if (array[j] == num) { 
+                repetido = 1; 
+                break; 
+            }
         }
-        if (!repetido) { array[elems++] = num; }
+        
+        if (!repetido) { 
+            array[elems++] = num; 
+        }
     }
 
     qsort(array, array_size, sizeof(int), compare_desc);
