@@ -10,7 +10,7 @@
 // Para hacer DP Pura, necesitamos un universo finito. Limitamos el acumulador máximo.
 #define MAX_ESTADO 1000000 
 #define INF 999999
-#define MAX_DEPTH 15
+#define MAX_DEPTH 10000
 
 
 typedef enum{ 

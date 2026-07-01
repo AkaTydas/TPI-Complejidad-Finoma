@@ -7,7 +7,7 @@
 
 #define NUMERO_OPERACIONES 8
 #define MAX_ESTADO 1000000 
-#define MAX_DEPTH 15
+#define MAX_DEPTH 1000000
 
 typedef enum { 
     OP_SUM, OP_RES, OP_MUL, OP_DIV, 

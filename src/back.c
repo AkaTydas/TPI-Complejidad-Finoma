@@ -136,7 +136,7 @@ void construir_arbol_implicito(int array[], int size, int goal, int nivel, int a
         return;
     }
 
-    if (nivel == 14) return;
+    if (nivel == INT_MAX) return;
 
     Move moves[size * NUMERO_OPERACIONES];
     int valid_moves_count = 0;
@@ -168,7 +168,7 @@ void construir_arbol_implicito(int array[], int size, int goal, int nivel, int a
 }
 
 void backtracking(int array[], int size, int goal) {
-    int max_depth = 15; 
+    int max_depth =INT_MAX-1; 
     int mejor_solucion = max_depth;
     
     Step *camino_actual = (Step *)calloc(max_depth, sizeof(Step));
