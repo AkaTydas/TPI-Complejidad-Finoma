@@ -19,7 +19,7 @@ int main(void)
     srand(time(NULL));
 
     int *array = NULL; int array_size; int goal;
-    int opcion; int metodo;
+    int opcion; int metodo; int precargados;
    
     do{
         printf("=============================================================\n");
@@ -41,6 +41,24 @@ int main(void)
 
             case 2: {
                 carga_aleatoria(&array, &array_size, &goal);
+                break;
+            }
+
+            case 3:{
+                printf("=============================================================\n");
+                printf("\t\tARREGLOS PRECARGADOS DE PRUEBA\n");
+                printf("=============================================================\n");
+                printf("1.BASICO\n");
+                printf("2.FALLA GREEDY\n");
+                printf("3.FALLA BACKTRACKING\n");
+                printf("=============================================================\n");
+                precargados = prompt_int("Seleccione una opcion: ");
+
+                switch (precargados){
+                    case 1:{array_size=3; array = malloc(array_size * sizeof(int)); array[0]=3;array[1]=5; array[2]=7; goal=21; break;}
+                    case 2:{array_size=2; array = malloc(array_size * sizeof(int)); array[0]=2;array[1]=3; goal=8; break;}
+                    case 3:{array_size=2; array = malloc(array_size * sizeof(int)); array[0]=1;array[1]=2; goal=200000; break;}
+                }
                 break;
             }
             case 4: (opcion = 4); break;
